@@ -29,20 +29,14 @@ requirements:
     - ninja
     - cmake
     - pkg-config
+  host:
+    - zlib
+    - pcre2
 
 outputs:
   - name: libsolv
     script: install.sh  # [unix]
-    requirements:
-      build:
-        - {{ compiler('c') }}
-        - {{ compiler('cxx') }}
-        - ninja
-        - cmake
-        - pkg-config
-      host:
-        - zlib
-        - pcre2
+    # `requirements` inheareted from global.
     test:
       commands:
         - test -f ${PREFIX}/lib/libsolv${SHLIB_EXT}     # [unix]
