@@ -3,7 +3,7 @@
 {% set build_number = "0" %}
 
 package:
-  name: libsolv
+  name: libsolv-suite
   version: {{ version }}
 
 source:
