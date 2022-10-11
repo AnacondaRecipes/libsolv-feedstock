@@ -24,13 +24,20 @@ requirements:
   build:
     - m2-patch  # [win]
     - patch     # [not win]
-  host:
-    - zlib
-    - pcre2
 
 outputs:
   - name: libsolv
     script: install.sh  # [unix]
+    requirements:
+      build:
+        - {{ compiler('c') }}
+        - {{ compiler('cxx') }}
+        - ninja
+        - cmake
+        - pkg-config
+      host:
+        - zlib
+        - pcre2
     test:
       commands:
         - test -f ${PREFIX}/lib/libsolv${SHLIB_EXT}     # [unix]
