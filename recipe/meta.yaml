@@ -40,8 +40,6 @@ outputs:
       build:
         - {{ compiler('c') }}
         - {{ compiler('cxx') }}
-        - m2-patch  # [win]
-        - patch     # [not win]
         - ninja
         - cmake
         - pkg-config
