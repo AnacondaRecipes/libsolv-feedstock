@@ -36,7 +36,18 @@ requirements:
 outputs:
   - name: libsolv
     script: install.sh  # [unix]
-    # `requirements` inheareted from global.
+    requirements:
+      build:
+        - {{ compiler('c') }}
+        - {{ compiler('cxx') }}
+        - m2-patch  # [win]
+        - patch     # [not win]
+        - ninja
+        - cmake
+        - pkg-config
+      host:
+        - zlib
+        - pcre2
     test:
       commands:
         - test -f ${PREFIX}/lib/libsolv${SHLIB_EXT}     # [unix]
