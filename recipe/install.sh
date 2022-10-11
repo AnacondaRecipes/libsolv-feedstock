@@ -1,5 +1,11 @@
+#!/bin/bash
+echo "Building ${PKG_NAME}."
+
 cd build
-ninja install
+
+# Installing
+echo "Installing..."
+ninja install || exit 1
 
 if [[ "$PKG_NAME" == *static ]]
 then

@@ -1,17 +1,42 @@
 #!/bin/bash
-mkdir -p build
-cd build
+echo "Building ${PKG_NAME}."
 
-cmake -G "Ninja" \
-      -DCMAKE_INSTALL_PREFIX=$PREFIX \
+# Isolate the build.
+mkdir -p build
+cd build || exit 1
+
+
+# Generate the build files.
+echo "Generating the build files..."
+cmake .. ${CMAKE_ARGS} \
+      -GNinja \
       -DCMAKE_PREFIX_PATH=$PREFIX \
+      -DCMAKE_INSTALL_PREFIX=$PREFIX \
+      -DCMAKE_BUILD_TYPE=Release \
       -DCMAKE_INSTALL_LIBDIR=lib \
       -DENABLE_CONDA=ON \
       -DMULTI_SEMANTICS=ON \
       -DENABLE_PCRE2=ON \
-      -DCMAKE_BUILD_TYPE=Release \
-      -DENABLE_STATIC=ON \
-      ${CMAKE_ARGS} \
-      ..
+      -DENABLE_STATIC=ON
 
-ninja
+
+# Build.
+echo "Building..."
+ninja || exit 1
+
+
+# Perform tests.
+#  echo "Testing..."
+#  ninja test || exit 1
+#  path_to/test || exit 1
+#  ctest -VV --output-on-failure || exit 1
+
+
+# Installing
+#echo "Installing..."
+#ninja install || exit 1
+
+
+# Error free exit!
+echo "Error free exit!"
+exit 0
