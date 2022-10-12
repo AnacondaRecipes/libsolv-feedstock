@@ -36,7 +36,8 @@ requirements:
 
 outputs:
   - name: libsolv
-    script: install.sh  # [unix]
+    script: install.sh           # [unix]
+    script: install_dynamic.bat  # [win]
     requirements:
       build:
         - {{ compiler('c') }}

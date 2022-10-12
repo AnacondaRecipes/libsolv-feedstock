@@ -23,9 +23,6 @@ if errorlevel 1 exit 1
 ninja
 if errorlevel 1 exit 1
 
-ninja install
-if errorlevel 1 exit 1
-
 cd ..
 mkdir static_build
 cd static_build
