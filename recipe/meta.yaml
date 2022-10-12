@@ -29,6 +29,7 @@ requirements:
     - ninja
     - cmake
     - pkg-config
+    - pcre2     # [win]
   host:
     - zlib
     - pcre2
@@ -43,6 +44,7 @@ outputs:
         - ninja
         - cmake
         - pkg-config
+        - pcre2     # [win]
       host:
         - zlib
         - pcre2
@@ -68,6 +70,7 @@ outputs:
         - ninja
         - cmake
         - pkg-config
+        - pcre2     # [win]
       host:
         - zlib
         - pcre2
