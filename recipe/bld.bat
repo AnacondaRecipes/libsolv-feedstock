@@ -16,13 +16,11 @@ cmake -G "Ninja" ^
       -D WITHOUT_COOKIEOPEN=ON ^
       -D CMAKE_BUILD_TYPE=Release ^
       -D DISABLE_SHARED=OFF ^
+      -D ENABLE_PCRE2=ON ^
       ..
 if errorlevel 1 exit 1
 
 ninja
-if errorlevel 1 exit 1
-
-ninja install
 if errorlevel 1 exit 1
 
 cd ..
@@ -39,6 +37,7 @@ cmake -G "Ninja" ^
       -D CMAKE_BUILD_TYPE=Release ^
       -D ENABLE_STATIC=ON ^
       -D DISABLE_SHARED=ON ^
+      -D ENABLE_PCRE2=ON ^
       ..
 
 if errorlevel 1 exit 1
