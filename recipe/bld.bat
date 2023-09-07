@@ -1,9 +1,3 @@
-set "CFLAGS= -MD"
-echo %CFLAGS%
-
-set "CXXFLAGS= -MD"
-echo %CXXFLAGS%
-
 mkdir build
 cd build
 
@@ -15,7 +9,9 @@ cmake -G "Ninja" ^
       -D MULTI_SEMANTICS=ON ^
       -D WITHOUT_COOKIEOPEN=ON ^
       -D CMAKE_BUILD_TYPE=Release ^
+      -D CMAKE_MSVC_RUNTIME_LIBRARY="MultiThreadedDLL" ^
       -D DISABLE_SHARED=OFF ^
+      -D ENABLE_STATIC=OFF ^
       -D ENABLE_PCRE2=ON ^
       ..
 if errorlevel 1 exit 1
@@ -35,6 +31,7 @@ cmake -G "Ninja" ^
       -D MULTI_SEMANTICS=ON ^
       -D WITHOUT_COOKIEOPEN=ON ^
       -D CMAKE_BUILD_TYPE=Release ^
+      -D CMAKE_MSVC_RUNTIME_LIBRARY="MultiThreadedDLL" ^
       -D ENABLE_STATIC=ON ^
       -D DISABLE_SHARED=ON ^
       -D ENABLE_PCRE2=ON ^
