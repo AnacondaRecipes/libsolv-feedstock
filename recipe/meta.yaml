@@ -30,6 +30,7 @@ requirements:
     - ninja
     - cmake
   host:
+    # pkg-config is placed in host because in build it is not available for win64
     - pkg-config
     - zlib
     - pcre2
@@ -45,6 +46,7 @@ outputs:
         - ninja
         - cmake
       host:
+        # pkg-config is placed in host because in build it is not available for win64
         - pkg-config
         - zlib
         - pcre2
