@@ -29,8 +29,8 @@ requirements:
     - patch     # [not win]
     - ninja
     - cmake
-    - pkg-config
   host:
+    - pkg-config
     - zlib
     - pcre2
 
@@ -44,8 +44,8 @@ outputs:
         - {{ compiler('cxx') }}
         - ninja
         - cmake
-        - pkg-config
       host:
+        - pkg-config
         - zlib
         - pcre2
     test:
@@ -74,8 +74,8 @@ outputs:
         - {{ compiler('cxx') }}
         - ninja
         - cmake
-        - pkg-config
       host:
+        - pkg-config
         - zlib
         - pcre2
         - {{ pin_subpackage("libsolv", exact=True) }}
