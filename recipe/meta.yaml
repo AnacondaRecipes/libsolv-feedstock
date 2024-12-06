@@ -1,5 +1,5 @@
 {% set name = "libsolv" %}
-{% set version = "0.7.24" %}
+{% set version = "0.7.30" %}
 
 package:
   name: {{ name|lower }}-suite
@@ -7,12 +7,12 @@ package:
 
 source:
   url: https://github.com/openSUSE/{{ name }}/archive/{{ version }}.tar.gz
-  sha256: 62743265222a729c7fe94c40f7b90ccc1ac5568f5ee6df46884e7ce3c16c78c7
+  sha256: ce4aa2f0e3c5c9ab99dced6a1810af3f670f1b98892394edc68ccabe7b272133
   patches:
-    - win_export_and_static_build.patch  # [win]
-    - conda_variant_priorization.patch
-    - pcre2-compat.patch                 # See https://github.com/openSUSE/libsolv/pull/506
-    - no_error_subdir_mismatch.patch
+    # - win_export_and_static_build.patch  # [win]
+    # - conda_variant_priorization.patch
+    # - pcre2-compat.patch                 # See https://github.com/openSUSE/libsolv/pull/506
+    # - no_error_subdir_mismatch.patch
 
 build:
   number: 0
