@@ -35,6 +35,7 @@ cmake -G "Ninja" ^
       -D ENABLE_STATIC=ON ^
       -D DISABLE_SHARED=ON ^
       -D ENABLE_PCRE2=ON ^
+      -D CMAKE_RELEASE_POSTFIX="_static" ^
       ..
 
 if errorlevel 1 exit 1
