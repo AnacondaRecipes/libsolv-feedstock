@@ -3,9 +3,9 @@ index 3541f496..a2ec792c 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
 @@ -33,6 +33,7 @@ OPTION (ENABLE_APPDATA "Build with AppStream appdata support?" OFF)
- 
+
  OPTION (MULTI_SEMANTICS "Build with support for multiple distribution types?" OFF)
- 
+
 +OPTION (ENABLE_PCRE2 "Build with PCRE2 as the regex engine" OFF)
  OPTION (ENABLE_LZMA_COMPRESSION "Build with lzma/xz compression support?" OFF)
  OPTION (ENABLE_BZIP2_COMPRESSION "Build with bzip2 compression support?" OFF)
@@ -13,7 +13,7 @@ index 3541f496..a2ec792c 100644
 @@ -203,6 +204,13 @@ IF (MULTI_SEMANTICS)
  MESSAGE (STATUS "Enabling multi dist support")
  ENDIF (MULTI_SEMANTICS)
- 
+
 +IF (ENABLE_PCRE2)
 +  MESSAGE (STATUS "Enabling PCRE2 regex engine")
 +  FIND_PACKAGE (PkgConfig REQUIRED)
@@ -35,7 +35,7 @@ index 3541f496..a2ec792c 100644
      SET (SWIG_FLAGS ${SWIG_FLAGS} -D${VAR})
 @@ -411,6 +419,9 @@ SET (SYSTEM_LIBRARIES ${SYSTEM_LIBRARIES} ${EXPAT_LIBRARY})
  ENDIF (WITH_LIBXML2 )
- 
+
  ENDIF (ENABLE_RPMMD OR ENABLE_SUSEREPO OR ENABLE_APPDATA OR ENABLE_COMPS OR ENABLE_HELIXREPO OR ENABLE_MDKREPO)
 +IF (ENABLE_PCRE2)
 +  SET (SYSTEM_LIBRARIES ${SYSTEM_LIBRARIES} ${PCRE2_LINK_LIBRARIES})
@@ -48,7 +48,7 @@ index bbf30bac..9a429fe4 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
 @@ -49,8 +49,10 @@ ENDIF (HAVE_LINKER_VERSION_SCRIPT)
- 
+
  IF (DISABLE_SHARED)
      ADD_LIBRARY (libsolv STATIC ${libsolv_SRCS})
 +    TARGET_LINK_LIBRARIES(libsolv ${SYSTEM_LIBRARIES})
@@ -56,7 +56,7 @@ index bbf30bac..9a429fe4 100644
      ADD_LIBRARY (libsolv SHARED ${libsolv_SRCS})
 +    TARGET_LINK_LIBRARIES(libsolv ${SYSTEM_LIBRARIES})
  ENDIF (DISABLE_SHARED)
- 
+
  IF (WIN32)
 diff --git a/src/conda.c b/src/conda.c
 index 6f6a65a6..ff91e13a 100644
@@ -74,12 +74,12 @@ index 6f6a65a6..ff91e13a 100644
 +#else
  #include <regex.h>
 +#endif
- 
+
  #include "pool.h"
  #include "repo.h"
 @@ -574,7 +581,7 @@ pool_conda_matchspec(Pool *pool, const char *name)
    int haveglob = 0;
- 
+
    /* ignore channel and namespace for now */
 -  if ((p2 = strrchr(name, ':')))
 +  if ((p2 = strrchr(name, ':')) && (p2 < strchr(name, ' ')))
@@ -115,7 +115,7 @@ index 72f03d48..24167170 100644
 +#else
  #include <regex.h>
 +#endif
- 
+
  #include "repo.h"
  #include "pool.h"
 diff --git a/src/solvversion.h.in b/src/solvversion.h.in
@@ -125,7 +125,7 @@ index da0ad743..35d33b92 100644
 @@ -30,6 +30,7 @@ extern const char solv_toolversion[];
  #cmakedefine LIBSOLV_FEATURE_MULTI_SEMANTICS
  #cmakedefine LIBSOLV_FEATURE_CONDA
- 
+
 +#cmakedefine LIBSOLVEXT_FEATURE_PCRE2
  #cmakedefine LIBSOLVEXT_FEATURE_RPMPKG
  #cmakedefine LIBSOLVEXT_FEATURE_RPMDB

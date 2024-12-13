@@ -5,7 +5,6 @@ echo "Building ${PKG_NAME}."
 mkdir -p build
 cd build || exit 1
 
-
 # Generate the build files.
 echo "Generating the build files..."
 cmake .. ${CMAKE_ARGS} \
@@ -19,11 +18,9 @@ cmake .. ${CMAKE_ARGS} \
 -DENABLE_PCRE2=ON \
 -DENABLE_STATIC=ON
 
-
 # Build.
 echo "Building..."
 ninja || exit 1
-
 
 # Perform tests.
 #  echo "Testing..."
@@ -31,11 +28,9 @@ ninja || exit 1
 #  path_to/test || exit 1
 #  ctest -VV --output-on-failure || exit 1
 
-
 # Installing
 #echo "Installing..."
 #ninja install || exit 1
-
 
 # Error free exit!
 echo "Error free exit!"
