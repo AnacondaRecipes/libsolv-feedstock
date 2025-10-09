@@ -25,11 +25,10 @@ requirements:
   build:
     - {{ compiler('c') }}
     - {{ compiler('cxx') }}
+    - pkg-config
     - ninja
     - cmake
   host:
-    # pkg-config is placed in host because in build it is not available for win64
-    - pkg-config
     - zlib {{ zlib }}
     - pcre2 {{ pcre2 }}
 
@@ -41,11 +40,10 @@ outputs:
       build:
         - {{ compiler('c') }}
         - {{ compiler('cxx') }}
+        - pkg-config
         - ninja
         - cmake
       host:
-        # pkg-config is placed in host because in build it is not available for win64
-        - pkg-config
         - zlib {{ zlib }}
         - pcre2 {{ pcre2 }}
     test:
@@ -72,10 +70,10 @@ outputs:
       build:
         - {{ compiler('c') }}
         - {{ compiler('cxx') }}
+        - pkg-config
         - ninja
         - cmake
       host:
-        - pkg-config
         - zlib {{ zlib }}
         - pcre2 {{ pcre2 }}
         - {{ pin_subpackage("libsolv", exact=True) }}
