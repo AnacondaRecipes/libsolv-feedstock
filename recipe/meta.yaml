@@ -15,7 +15,7 @@ source:
     - patches/pcre2-compat.patch
 
 build:
-  number: 1
+  number: 2
   run_exports:
     - {{ pin_subpackage('libsolv', max_pin='x.x') }}
   ignore_run_exports:  # [win]
@@ -25,15 +25,13 @@ requirements:
   build:
     - {{ compiler('c') }}
     - {{ compiler('cxx') }}
-    - m2-patch  # [win]
-    - patch     # [not win]
     - ninja
     - cmake
   host:
     # pkg-config is placed in host because in build it is not available for win64
     - pkg-config
-    - zlib
-    - pcre2
+    - zlib {{ zlib }}
+    - pcre2 {{ pcre2 }}
 
 outputs:
   - name: libsolv
@@ -48,8 +46,8 @@ outputs:
       host:
         # pkg-config is placed in host because in build it is not available for win64
         - pkg-config
-        - zlib
-        - pcre2
+        - zlib {{ zlib }}
+        - pcre2 {{ pcre2 }}
     test:
       commands:
         - test -f ${PREFIX}/lib/libsolv${SHLIB_EXT}     # [unix]
@@ -78,8 +76,8 @@ outputs:
         - cmake
       host:
         - pkg-config
-        - zlib
-        - pcre2
+        - zlib {{ zlib }}
+        - pcre2 {{ pcre2 }}
         - {{ pin_subpackage("libsolv", exact=True) }}
       run:
         - {{ pin_subpackage("libsolv", exact=True) }}
