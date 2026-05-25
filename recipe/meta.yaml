@@ -9,10 +9,10 @@ source:
   url: https://github.com/openSUSE/{{ name }}/archive/{{ version }}.tar.gz
   sha256: ad6a38624dde26fc59c41427608536c443b76f90dcb6bb96c2e70b8e3ee20419
   patches:
-    - patches/win_export_and_static_build.patch  # [win]
     - patches/conda_variant_priorization.patch
     - patches/no_error_subdir_mismatch.patch
     - patches/pcre2-compat.patch
+    - patches/win_export_and_static_build.patch  # [win]
 
 build:
   number: 0
