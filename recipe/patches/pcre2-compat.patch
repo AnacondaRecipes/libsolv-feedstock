@@ -1,19 +1,32 @@
+From 017f035812ab846f4a4a3b6921c877621436f160 Mon Sep 17 00:00:00 2001
+From: Andrii Osipov <aosipov@anaconda.com>
+Date: Mon, 25 May 2026 04:32:10 -0700
+Subject: [PATCH] PCRE2 compatibility patch
+
+---
+ CMakeLists.txt       | 14 +++++++++++++-
+ src/CMakeLists.txt   |  2 ++
+ src/conda.c          | 13 ++++++++++---
+ src/repodata.c       |  7 +++++++
+ src/solvversion.h.in |  1 +
+ 5 files changed, 33 insertions(+), 4 deletions(-)
+
 diff --git a/CMakeLists.txt b/CMakeLists.txt
-index 3541f496..a2ec792c 100644
+index 5ba5ed5..8c3b765 100644
 --- a/CMakeLists.txt
 +++ b/CMakeLists.txt
-@@ -33,6 +33,7 @@ OPTION (ENABLE_APPDATA "Build with AppStream appdata support?" OFF)
-
+@@ -35,6 +35,7 @@ OPTION (ENABLE_APPDATA "Build with AppStream appdata support?" OFF)
+ 
  OPTION (MULTI_SEMANTICS "Build with support for multiple distribution types?" OFF)
-
+ 
 +OPTION (ENABLE_PCRE2 "Build with PCRE2 as the regex engine" OFF)
  OPTION (ENABLE_LZMA_COMPRESSION "Build with lzma/xz compression support?" OFF)
  OPTION (ENABLE_BZIP2_COMPRESSION "Build with bzip2 compression support?" OFF)
  OPTION (ENABLE_ZSTD_COMPRESSION "Build with zstd compression support?" OFF)
-@@ -203,6 +204,13 @@ IF (MULTI_SEMANTICS)
+@@ -212,6 +213,13 @@ IF (MULTI_SEMANTICS)
  MESSAGE (STATUS "Enabling multi dist support")
  ENDIF (MULTI_SEMANTICS)
-
+ 
 +IF (ENABLE_PCRE2)
 +  MESSAGE (STATUS "Enabling PCRE2 regex engine")
 +  FIND_PACKAGE (PkgConfig REQUIRED)
@@ -24,18 +37,19 @@ index 3541f496..a2ec792c 100644
  IF (ENABLE_RPMDB)
  SET (ENABLE_RPMPKG ON)
  ENDIF (ENABLE_RPMDB)
-@@ -313,7 +321,7 @@ FOREACH (VAR
-   ENABLE_HELIXREPO ENABLE_MDKREPO ENABLE_ARCHREPO ENABLE_DEBIAN ENABLE_HAIKU
+@@ -318,7 +326,8 @@ FOREACH (VAR
    ENABLE_ZLIB_COMPRESSION ENABLE_LZMA_COMPRESSION ENABLE_BZIP2_COMPRESSION
    ENABLE_ZSTD_COMPRESSION ENABLE_ZCHUNK_COMPRESSION ENABLE_PGPVRFY ENABLE_APPDATA
+   ENABLE_APK
 -  WITH_SYSTEM_ZCHUNK)
-+  WITH_SYSTEM_ZCHUNK ENABLE_PCRE2)
++  WITH_SYSTEM_ZCHUNK
++  ENABLE_PCRE2)
    IF(${VAR})
      ADD_DEFINITIONS (-D${VAR}=1)
      SET (SWIG_FLAGS ${SWIG_FLAGS} -D${VAR})
-@@ -411,6 +419,9 @@ SET (SYSTEM_LIBRARIES ${SYSTEM_LIBRARIES} ${EXPAT_LIBRARY})
+@@ -417,6 +426,9 @@ SET (SYSTEM_LIBRARIES ${SYSTEM_LIBRARIES} ${EXPAT_LIBRARY})
  ENDIF (WITH_LIBXML2 )
-
+ 
  ENDIF (ENABLE_RPMMD OR ENABLE_SUSEREPO OR ENABLE_APPDATA OR ENABLE_COMPS OR ENABLE_HELIXREPO OR ENABLE_MDKREPO)
 +IF (ENABLE_PCRE2)
 +  SET (SYSTEM_LIBRARIES ${SYSTEM_LIBRARIES} ${PCRE2_LINK_LIBRARIES})
@@ -44,11 +58,11 @@ index 3541f496..a2ec792c 100644
  SET (SYSTEM_LIBRARIES ${SYSTEM_LIBRARIES} ${ZLIB_LIBRARY})
  ENDIF (ENABLE_ZLIB_COMPRESSION)
 diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
-index bbf30bac..9a429fe4 100644
+index 812abe6..032829c 100644
 --- a/src/CMakeLists.txt
 +++ b/src/CMakeLists.txt
-@@ -49,8 +49,10 @@ ENDIF (HAVE_LINKER_VERSION_SCRIPT)
-
+@@ -54,8 +54,10 @@ ENDIF (HAVE_LINKER_VERSION_SCRIPT)
+ 
  IF (DISABLE_SHARED)
      ADD_LIBRARY (libsolv STATIC ${libsolv_SRCS})
 +    TARGET_LINK_LIBRARIES(libsolv ${SYSTEM_LIBRARIES})
@@ -56,10 +70,10 @@ index bbf30bac..9a429fe4 100644
      ADD_LIBRARY (libsolv SHARED ${libsolv_SRCS})
 +    TARGET_LINK_LIBRARIES(libsolv ${SYSTEM_LIBRARIES})
  ENDIF (DISABLE_SHARED)
-
+ 
  IF (WIN32)
 diff --git a/src/conda.c b/src/conda.c
-index 6f6a65a6..ff91e13a 100644
+index 6f6a65a..ff91e13 100644
 --- a/src/conda.c
 +++ b/src/conda.c
 @@ -17,7 +17,14 @@
@@ -74,12 +88,12 @@ index 6f6a65a6..ff91e13a 100644
 +#else
  #include <regex.h>
 +#endif
-
+ 
  #include "pool.h"
  #include "repo.h"
 @@ -574,7 +581,7 @@ pool_conda_matchspec(Pool *pool, const char *name)
    int haveglob = 0;
-
+ 
    /* ignore channel and namespace for now */
 -  if ((p2 = strrchr(name, ':')))
 +  if ((p2 = strrchr(name, ':')) && (p2 < strchr(name, ' ')))
@@ -100,7 +114,7 @@ index 6f6a65a6..ff91e13a 100644
  	      p--;
  	      continue;	/* special case space: it may be in the build */
 diff --git a/src/repodata.c b/src/repodata.c
-index 72f03d48..24167170 100644
+index 9c26503..aa99fc1 100644
 --- a/src/repodata.c
 +++ b/src/repodata.c
 @@ -22,7 +22,14 @@
@@ -115,18 +129,21 @@ index 72f03d48..24167170 100644
 +#else
  #include <regex.h>
 +#endif
-
+ 
  #include "repo.h"
  #include "pool.h"
 diff --git a/src/solvversion.h.in b/src/solvversion.h.in
-index da0ad743..35d33b92 100644
+index 6c766de..46f7922 100644
 --- a/src/solvversion.h.in
 +++ b/src/solvversion.h.in
 @@ -30,6 +30,7 @@ extern const char solv_toolversion[];
  #cmakedefine LIBSOLV_FEATURE_MULTI_SEMANTICS
  #cmakedefine LIBSOLV_FEATURE_CONDA
-
+ 
 +#cmakedefine LIBSOLVEXT_FEATURE_PCRE2
  #cmakedefine LIBSOLVEXT_FEATURE_RPMPKG
  #cmakedefine LIBSOLVEXT_FEATURE_RPMDB
  #cmakedefine LIBSOLVEXT_FEATURE_RPMDB_BYRPMHEADER
+-- 
+2.39.5 (Apple Git-154)
+
