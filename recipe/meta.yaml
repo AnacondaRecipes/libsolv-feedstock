@@ -1,5 +1,5 @@
 {% set name = "libsolv" %}
-{% set version = "0.7.37" %}
+{% set version = "0.7.39" %}
 
 package:
   name: {{ name }}-suite
@@ -7,7 +7,7 @@ package:
 
 source:
   url: https://github.com/openSUSE/{{ name }}/archive/{{ version }}.tar.gz
-  sha256: ad6a38624dde26fc59c41427608536c443b76f90dcb6bb96c2e70b8e3ee20419
+  sha256: 2a74cbf1e49984cb01f75ac4b19a237f24de6ce199766858aeb9ab3aae2b95fa
   patches:
     - patches/conda_variant_priorization.patch
     - patches/no_error_subdir_mismatch.patch
@@ -19,7 +19,7 @@ build:
   run_exports:
     - {{ pin_subpackage('libsolv', max_pin='x.x') }}
   ignore_run_exports:  # [win]
-    - zlib             # [win]
+    - zlib  # [win]
 
 requirements:
   build:
@@ -35,7 +35,7 @@ requirements:
 
 outputs:
   - name: libsolv
-    script: install.sh           # [unix]
+    script: install.sh  # [unix]
     script: install_dynamic.bat  # [win]
     requirements:
       build:
@@ -50,23 +50,22 @@ outputs:
         - pcre2 {{ pcre2 }}
     test:
       commands:
-        - test -f ${PREFIX}/lib/libsolv${SHLIB_EXT}     # [unix]
+        - test -f ${PREFIX}/lib/libsolv${SHLIB_EXT}  # [unix]
         - test -f ${PREFIX}/lib/libsolvext${SHLIB_EXT}  # [unix]
-        - test -f ${PREFIX}/lib/libsolv.so.1            # [linux]
-        - test -f ${PREFIX}/include/solv/repo.h         # [unix]
-        - if not exist %LIBRARY_INC%\solv\repo.h (exit 1)     # [win]
-        - if not exist %LIBRARY_BIN%\solv.dll (exit 1)        # [win]
-        - if not exist %LIBRARY_LIB%\solv.lib (exit 1)        # [win]
-        - if not exist %LIBRARY_BIN%\solvext.dll (exit 1)     # [win]
-        - if not exist %LIBRARY_LIB%\solvext.lib (exit 1)     # [win]
-        - if exist %LIBRARY_LIB%\solv_static.lib (exit 1)     # [win]
+        - test -f ${PREFIX}/lib/libsolv.so.1  # [linux]
+        - test -f ${PREFIX}/include/solv/repo.h  # [unix]
+        - if not exist %LIBRARY_INC%\solv\repo.h (exit 1)  # [win]
+        - if not exist %LIBRARY_BIN%\solv.dll (exit 1)  # [win]
+        - if not exist %LIBRARY_LIB%\solv.lib (exit 1)  # [win]
+        - if not exist %LIBRARY_BIN%\solvext.dll (exit 1)  # [win]
+        - if not exist %LIBRARY_LIB%\solvext.lib (exit 1)  # [win]
+        - if exist %LIBRARY_LIB%\solv_static.lib (exit 1)  # [win]
         - if exist %LIBRARY_LIB%\solvext_static.lib (exit 1)  # [win]
         # Running the executables
         - dumpsolv.exe -h  # [win]
-        - dumpsolv -h      # [unix]
-
+        - dumpsolv -h  # [unix]
   - name: libsolv-static
-    script: install.sh          # [unix]
+    script: install.sh  # [unix]
     script: install_static.bat  # [win]
     requirements:
       build:
@@ -84,9 +83,9 @@ outputs:
         - {{ pin_subpackage("libsolv", exact=True) }}
     test:
       commands:
-        - test -f "${PREFIX}/lib/libsolv.a"     # [unix]
+        - test -f "${PREFIX}/lib/libsolv.a"  # [unix]
         - test -f "${PREFIX}/lib/libsolvext.a"  # [unix]
-        - if not exist %LIBRARY_LIB%\solv_static.lib (exit 1)     # [win]
+        - if not exist %LIBRARY_LIB%\solv_static.lib (exit 1)  # [win]
         - if not exist %LIBRARY_LIB%\solvext_static.lib (exit 1)  # [win]
 
 about:
