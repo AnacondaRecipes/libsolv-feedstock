@@ -1,0 +1,133 @@
+--- a/src/policy.c	2026-10-08 14:21:17
++++ b/src/policy.c	2026-10-08 14:21:17
+@@ -1023,14 +1023,31 @@
+   Solvable *stmp, *best = pool_id2solvable(pool, selection.elements[0]);
+   int cmp;
+ 
++  /* Only look at providers from the highest-priority repo: lower-priority
++   * providers are pruned by solver_prune_to_highest_prio before they could be
++   * chosen, so they must not cancel the track_features penalty (cls#1042). */
++  int maxprio = 0, havemaxprio = 0;
++  for (int i = 0; i < selection.count; ++i)
++    {
++      Solvable *ps = pool_id2solvable(pool, selection.elements[i]);
++      if (ps->repo && (!havemaxprio || ps->repo->priority > maxprio))
++        {
++          maxprio = ps->repo->priority;
++          havemaxprio = 1;
++        }
++    }
+   *all_have_trackfeatures = 1;
+   for (int i = 0; i < selection.count; ++i)
+-    if (solvable_lookup_count(pool_id2solvable(pool, selection.elements[i]),
+-                              SOLVABLE_TRACK_FEATURES) == 0)
+-      {
+-        *all_have_trackfeatures = 0;
+-        break;
+-      }
++    {
++      Solvable *ps = pool_id2solvable(pool, selection.elements[i]);
++      if (havemaxprio && ps->repo && ps->repo->priority != maxprio)
++        continue;
++      if (solvable_lookup_count(ps, SOLVABLE_TRACK_FEATURES) == 0)
++        {
++          *all_have_trackfeatures = 0;
++          break;
++        }
++    }
+   
+   for (int i = 0; i < selection.count; ++i)
+   {
+@@ -1042,7 +1059,7 @@
+   return best->evr;
+ }
+ 
+-int conda_compare_dependencies(Pool *pool, Solvable *s1, Solvable *s2)
++int conda_compare_dependencies_split(Pool *pool, Solvable *s1, Solvable *s2, int *tfscore)
+ {
+   int i, j, has_seen;
+   Queue q1, q2, seen;
+@@ -1055,6 +1072,7 @@
+   solvable_lookup_deparray(s2, SOLVABLE_REQUIRES, &q2, -1);
+ 
+   int comparison_result = 0;
++  *tfscore = 0;
+ 
+   for (i = 0; i < q1.count; ++i)
+   {
+@@ -1092,7 +1110,7 @@
+     // if one has deps with track features, and the other does not, 
+     // downweight the one with track features
+     if (aht_1 != aht_2)
+-      comparison_result += (aht_1 - aht_2) * 100;
++      *tfscore += (aht_1 - aht_2);
+ 
+     comparison_result += pool_evrcmp(pool, b2, b1, 0);
+   }
+@@ -1104,6 +1122,13 @@
+   return comparison_result;
+ }
+ 
++int conda_compare_dependencies(Pool *pool, Solvable *s1, Solvable *s2)
++{
++  int tf;
++  int r = conda_compare_dependencies_split(pool, s1, s2, &tf);
++  return tf * 100 + r;
++}
++
+ static int
+ sort_by_best_dependencies(const void *ap, const void *bp, void *dp)
+ {
+@@ -1116,8 +1141,16 @@
+   sa = pool->solvables + a;
+   sb = pool->solvables + b;
+ 
+-  int res = conda_compare_dependencies(pool, sa, sb);
++  /* order: dependency track_features penalty, build number,
++   * dependency versions, timestamp, build string, id (cls#1042) */
++  int tf;
++  int dep = conda_compare_dependencies_split(pool, sa, sb, &tf);
++  int res = tf;
+   if (res == 0)
++    res = -pool_buildversioncmp(pool, sa, sb);
++  if (res == 0)
++    res = dep;
++  if (res == 0)
+   {
+     // no differences, select later build
+     Repodata* ra = repo_last_repodata(sa->repo);
+@@ -1126,12 +1159,20 @@
+     unsigned long long bta = repodata_lookup_num(ra, a, SOLVABLE_BUILDTIME, 0ull);
+     unsigned long long btb = repodata_lookup_num(rb, b, SOLVABLE_BUILDTIME, 0ull);
+ 
+-    res = (btb > bta) ? 1 : -1;
++    res = (btb > bta) ? 1 : (btb < bta) ? -1 : 0;
++    if (res == 0)
++      {
++        const char *fa = solvable_lookup_str(sa, SOLVABLE_BUILDFLAVOR);
++        const char *fb = solvable_lookup_str(sb, SOLVABLE_BUILDFLAVOR);
++        res = strcmp(fa ? fa : "", fb ? fb : "");
++      }
++    if (res == 0)
++      res = a < b ? -1 : a > b ? 1 : 0;
+     POOL_DEBUG(SOLV_DEBUG_POLICY, "Fallback to timestamp comparison: %llu vs %llu: [%d]\n", bta, btb, res);
+   }
+ 
+-  POOL_DEBUG(SOLV_DEBUG_POLICY, "Selecting variant [%c] of (a) %s vs (b) %s (score: %d)\n",
+-             (res < 0 ? 'a' : 'b'), pool_solvable2str(pool, sa), pool_solvable2str(pool, sb), res);
++  POOL_DEBUG(SOLV_DEBUG_POLICY, "Selecting variant [%c] of (a) %s vs (b) %s (score: tf=%d dep=%d res=%d)\n",
++             (res < 0 ? 'a' : 'b'), pool_solvable2str(pool, sa), pool_solvable2str(pool, sb), tf, dep, res);
+ 
+   return res; 
+ }
+@@ -1204,8 +1245,8 @@
+         r = best->evr != s->evr ? pool_evrcmp(pool, best->evr, s->evr, EVRCMP_COMPARE) : 0;
+       if (r == 0)
+         r = (best->repo ? best->repo->subpriority : 0) - (s->repo ? s->repo->subpriority : 0);
+-      if (r == 0)
+-        r = pool_buildversioncmp(pool, best, s);
++      /* build number is compared inside sort_by_best_dependencies, after
++       * the dependency track_features penalty (cls#1042) */
+       if (r == 0)
+         queue_push(&q, s - pool->solvables);
+     }
