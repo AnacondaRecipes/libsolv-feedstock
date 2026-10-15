@@ -1,5 +1,5 @@
---- a/src/policy.c	2026-10-08 14:21:17
-+++ b/src/policy.c	2026-10-08 14:21:17
+--- a/src/policy.c	2026-10-15 13:53:34
++++ b/src/policy.c	2026-10-15 13:53:34
 @@ -1023,14 +1023,31 @@
    Solvable *stmp, *best = pool_id2solvable(pool, selection.elements[0]);
    int cmp;
@@ -120,14 +120,39 @@
  
    return res; 
  }
-@@ -1204,8 +1245,8 @@
+@@ -1204,9 +1245,9 @@
          r = best->evr != s->evr ? pool_evrcmp(pool, best->evr, s->evr, EVRCMP_COMPARE) : 0;
        if (r == 0)
          r = (best->repo ? best->repo->subpriority : 0) - (s->repo ? s->repo->subpriority : 0);
--      if (r == 0)
--        r = pool_buildversioncmp(pool, best, s);
 +      /* build number is compared inside sort_by_best_dependencies, after
 +       * the dependency track_features penalty (cls#1042) */
        if (r == 0)
+-        r = pool_buildversioncmp(pool, best, s);
+-      if (r == 0)
          queue_push(&q, s - pool->solvables);
      }
+ 
+@@ -1214,6 +1255,23 @@
+     {
+       // order by first-level deps
+       solv_sort(q.elements, q.count, sizeof(Id), sort_by_best_dependencies, pool);
++
++      /* Keep only the candidates that tie with the winner on the dependency
++       * track_features penalty and build number. This restores the old
++       * "one build number per version" pruning, with the build number now
++       * chosen after the track_features penalty. Otherwise lower build
++       * numbers (an installed older build, or cpu vs. cuda builds of the
++       * same version) would survive as alternatives (cls#1042). */
++      Solvable *first = pool->solvables + q.elements[0];
++      for (i = j = 1; i < q.count; i++)
++        {
++          int tf;
++          s = pool->solvables + q.elements[i];
++          conda_compare_dependencies_split(pool, first, s, &tf);
++          if (tf == 0 && pool_buildversioncmp(pool, first, s) == 0)
++            q.elements[j++] = q.elements[i];
++        }
++      queue_truncate(&q, j);
+     }
+ 
+   for (i = 0; i < q.count; ++i)
