@@ -13,6 +13,7 @@ source:
     - patches/no_error_subdir_mismatch.patch
     - patches/pcre2-compat.patch
     - patches/win_export_and_static_build.patch  # [win]
+    - patches/cls1042-libsolv-fix.patch
 
 build:
   number: 1
