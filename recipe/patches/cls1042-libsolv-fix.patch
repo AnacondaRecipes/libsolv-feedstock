@@ -1,19 +1,50 @@
---- a/src/policy.c	2026-10-15 13:53:34
-+++ b/src/policy.c	2026-10-15 13:53:34
-@@ -1023,14 +1023,31 @@
+conda: fix channel-dependent track_features flip (conda-libmamba-solver#1042)
+
+Applies after conda_variant_priorization.patch.
+
+- best_matching(): compute "all providers have track_features" only over
+  providers from the highest-priority repo. Lower-priority providers are
+  pruned by solver_prune_to_highest_prio before they could be chosen, so a
+  never-selected record (e.g. pkgs/main python_abi *_cp314t without
+  track_features) must not cancel the penalty. Also free `selection`.
+- sort_by_best_dependencies(): equal timestamps no longer return an unstable
+  -1; fall back to build string, then solvable id, so the result does not
+  depend on index composition.
+- Add conda testsolv cases for both.
+
+Build number is still compared before dependency track_features (unchanged);
+conda-forge uses build-number offsets as a preference signal (e.g. pytorch
+cuda vs cpu). The pandas ft-vs-GIL case is fixed by job order in
+conda-libmamba-solver instead.
+
+diff --git a/src/policy.c b/src/policy.c
+index 1882443..792688d 100644
+--- a/src/policy.c
++++ b/src/policy.c
+@@ -1018,19 +1018,40 @@ Id best_matching(Pool* pool, Queue* q, Id name, int* all_have_trackfeatures)
+   }
+ 
+   if (selection.count == 0)
+-    return 0;
++    {
++      queue_free(&selection);
++      return 0;
++    }
+ 
    Solvable *stmp, *best = pool_id2solvable(pool, selection.elements[0]);
    int cmp;
  
-+  /* Only look at providers from the highest-priority repo: lower-priority
-+   * providers are pruned by solver_prune_to_highest_prio before they could be
-+   * chosen, so they must not cancel the track_features penalty (cls#1042). */
++  /* Only consider providers from the highest-priority repo. Providers from
++   * lower-priority repos are removed by solver_prune_to_highest_prio before
++   * they could be chosen, so they must not cancel the track_features penalty.
++   * https://github.com/conda/conda-libmamba-solver/issues/1042 */
 +  int maxprio = 0, havemaxprio = 0;
 +  for (int i = 0; i < selection.count; ++i)
 +    {
-+      Solvable *ps = pool_id2solvable(pool, selection.elements[i]);
-+      if (ps->repo && (!havemaxprio || ps->repo->priority > maxprio))
++      stmp = pool_id2solvable(pool, selection.elements[i]);
++      if (stmp->repo && (!havemaxprio || stmp->repo->priority > maxprio))
 +        {
-+          maxprio = ps->repo->priority;
++          maxprio = stmp->repo->priority;
 +          havemaxprio = 1;
 +        }
 +    }
@@ -26,10 +57,10 @@
 -        break;
 -      }
 +    {
-+      Solvable *ps = pool_id2solvable(pool, selection.elements[i]);
-+      if (havemaxprio && ps->repo && ps->repo->priority != maxprio)
++      stmp = pool_id2solvable(pool, selection.elements[i]);
++      if (havemaxprio && stmp->repo && stmp->repo->priority != maxprio)
 +        continue;
-+      if (solvable_lookup_count(ps, SOLVABLE_TRACK_FEATURES) == 0)
++      if (solvable_lookup_count(stmp, SOLVABLE_TRACK_FEATURES) == 0)
 +        {
 +          *all_have_trackfeatures = 0;
 +          break;
@@ -38,70 +69,24 @@
    
    for (int i = 0; i < selection.count; ++i)
    {
-@@ -1042,7 +1059,7 @@
+@@ -1039,6 +1060,7 @@ Id best_matching(Pool* pool, Queue* q, Id name, int* all_have_trackfeatures)
+     if (cmp < 0) best = stmp;
+   }
+ 
++  queue_free(&selection);
    return best->evr;
  }
  
--int conda_compare_dependencies(Pool *pool, Solvable *s1, Solvable *s2)
-+int conda_compare_dependencies_split(Pool *pool, Solvable *s1, Solvable *s2, int *tfscore)
- {
-   int i, j, has_seen;
-   Queue q1, q2, seen;
-@@ -1055,6 +1072,7 @@
-   solvable_lookup_deparray(s2, SOLVABLE_REQUIRES, &q2, -1);
- 
-   int comparison_result = 0;
-+  *tfscore = 0;
- 
-   for (i = 0; i < q1.count; ++i)
-   {
-@@ -1092,7 +1110,7 @@
-     // if one has deps with track features, and the other does not, 
-     // downweight the one with track features
-     if (aht_1 != aht_2)
--      comparison_result += (aht_1 - aht_2) * 100;
-+      *tfscore += (aht_1 - aht_2);
- 
-     comparison_result += pool_evrcmp(pool, b2, b1, 0);
-   }
-@@ -1104,6 +1122,13 @@
-   return comparison_result;
- }
- 
-+int conda_compare_dependencies(Pool *pool, Solvable *s1, Solvable *s2)
-+{
-+  int tf;
-+  int r = conda_compare_dependencies_split(pool, s1, s2, &tf);
-+  return tf * 100 + r;
-+}
-+
- static int
- sort_by_best_dependencies(const void *ap, const void *bp, void *dp)
- {
-@@ -1116,8 +1141,16 @@
-   sa = pool->solvables + a;
-   sb = pool->solvables + b;
- 
--  int res = conda_compare_dependencies(pool, sa, sb);
-+  /* order: dependency track_features penalty, build number,
-+   * dependency versions, timestamp, build string, id (cls#1042) */
-+  int tf;
-+  int dep = conda_compare_dependencies_split(pool, sa, sb, &tf);
-+  int res = tf;
-   if (res == 0)
-+    res = -pool_buildversioncmp(pool, sa, sb);
-+  if (res == 0)
-+    res = dep;
-+  if (res == 0)
-   {
-     // no differences, select later build
-     Repodata* ra = repo_last_repodata(sa->repo);
-@@ -1126,12 +1159,20 @@
+@@ -1126,7 +1148,19 @@ sort_by_best_dependencies(const void *ap, const void *bp, void *dp)
      unsigned long long bta = repodata_lookup_num(ra, a, SOLVABLE_BUILDTIME, 0ull);
      unsigned long long btb = repodata_lookup_num(rb, b, SOLVABLE_BUILDTIME, 0ull);
  
 -    res = (btb > bta) ? 1 : -1;
 +    res = (btb > bta) ? 1 : (btb < bta) ? -1 : 0;
++    /* Equal timestamps (common after ms -> s truncation): fall back to a
++     * deterministic order instead of an unstable -1, so the result does not
++     * depend on solv_sort's input order, i.e. on how the index was composed.
++     * https://github.com/conda/conda-libmamba-solver/issues/1042 */
 +    if (res == 0)
 +      {
 +        const char *fa = solvable_lookup_str(sa, SOLVABLE_BUILDFLAVOR);
@@ -113,46 +98,98 @@
      POOL_DEBUG(SOLV_DEBUG_POLICY, "Fallback to timestamp comparison: %llu vs %llu: [%d]\n", bta, btb, res);
    }
  
--  POOL_DEBUG(SOLV_DEBUG_POLICY, "Selecting variant [%c] of (a) %s vs (b) %s (score: %d)\n",
--             (res < 0 ? 'a' : 'b'), pool_solvable2str(pool, sa), pool_solvable2str(pool, sb), res);
-+  POOL_DEBUG(SOLV_DEBUG_POLICY, "Selecting variant [%c] of (a) %s vs (b) %s (score: tf=%d dep=%d res=%d)\n",
-+             (res < 0 ? 'a' : 'b'), pool_solvable2str(pool, sa), pool_solvable2str(pool, sb), tf, dep, res);
- 
-   return res; 
- }
-@@ -1204,9 +1245,9 @@
-         r = best->evr != s->evr ? pool_evrcmp(pool, best->evr, s->evr, EVRCMP_COMPARE) : 0;
-       if (r == 0)
-         r = (best->repo ? best->repo->subpriority : 0) - (s->repo ? s->repo->subpriority : 0);
-+      /* build number is compared inside sort_by_best_dependencies, after
-+       * the dependency track_features penalty (cls#1042) */
-       if (r == 0)
--        r = pool_buildversioncmp(pool, best, s);
--      if (r == 0)
-         queue_push(&q, s - pool->solvables);
-     }
- 
-@@ -1214,6 +1255,23 @@
-     {
-       // order by first-level deps
-       solv_sort(q.elements, q.count, sizeof(Id), sort_by_best_dependencies, pool);
+diff --git a/test/testcases/conda/timestamp_tie.t b/test/testcases/conda/timestamp_tie.t
+new file mode 100644
+index 0000000..548f9f5
+--- /dev/null
++++ b/test/testcases/conda/timestamp_tie.t
+@@ -0,0 +1,39 @@
++repo system 0 empty
++repo available 0 testtags <inline>
++#>=Pkg: dep 1 - noarch
++#>=Flv: x
++#>=Pkg: dep 1 - noarch
++#>=Flv: y
++#>=Pkg: foo 1 - noarch
++#>=Flv: b_0
++#>=Bvr: 0
++#>=Tim: 1788129265
++#>=Req: dep <CONDA> 1\20y
++#>=Pkg: foo 1 - noarch
++#>=Flv: a_0
++#>=Bvr: 0
++#>=Tim: 1788129265
++#>=Req: dep <CONDA> 1\20x
++#>=Pkg: bar 1 - noarch
++#>=Flv: a_0
++#>=Bvr: 0
++#>=Tim: 1788129265
++#>=Req: dep <CONDA> 1\20x
++#>=Pkg: bar 1 - noarch
++#>=Flv: b_0
++#>=Bvr: 0
++#>=Tim: 1788129265
++#>=Req: dep <CONDA> 1\20y
++system unset conda system
 +
-+      /* Keep only the candidates that tie with the winner on the dependency
-+       * track_features penalty and build number. This restores the old
-+       * "one build number per version" pruning, with the build number now
-+       * chosen after the track_features penalty. Otherwise lower build
-+       * numbers (an installed older build, or cpu vs. cuda builds of the
-+       * same version) would survive as alternatives (cls#1042). */
-+      Solvable *first = pool->solvables + q.elements[0];
-+      for (i = j = 1; i < q.count; i++)
-+        {
-+          int tf;
-+          s = pool->solvables + q.elements[i];
-+          conda_compare_dependencies_split(pool, first, s, &tf);
-+          if (tf == 0 && pool_buildversioncmp(pool, first, s) == 0)
-+            q.elements[j++] = q.elements[i];
-+        }
-+      queue_truncate(&q, j);
-     }
- 
-   for (i = 0; i < q.count; ++i)
++job install name foo
++result transaction,problems <inline>
++#>install dep-1-x.noarch@available
++#>install foo-1-a_0.noarch@available
++
++nextjob
++
++job install name bar
++result transaction,problems <inline>
++#>install bar-1-a_0.noarch@available
++#>install dep-1-x.noarch@available
+diff --git a/test/testcases/conda/trackfeatures_lowerprio.t b/test/testcases/conda/trackfeatures_lowerprio.t
+new file mode 100644
+index 0000000..a082ee4
+--- /dev/null
++++ b/test/testcases/conda/trackfeatures_lowerprio.t
+@@ -0,0 +1,44 @@
++repo system 0 empty
++repo conda-forge 1 testtags <inline>
++#>=Pkg: python 3.14.7 - noarch
++#>=Flv: h0_106_cp314
++#>=Bvr: 106
++#>=Req: python_abi <CONDA> 3.14.*\20*_cp314
++#>=Pkg: python 3.14.7 - noarch
++#>=Flv: h0_6_cp314t
++#>=Bvr: 6
++#>=Trf: py_freethreading
++#>=Req: python_abi <CONDA> 3.14.*\20*_cp314t
++#>=Pkg: python_abi 3.14 - noarch
++#>=Flv: 8_cp314
++#>=Bvr: 8
++#>=Pkg: python_abi 3.14 - noarch
++#>=Flv: 8_cp314t
++#>=Bvr: 8
++#>=Trf: freethreading
++#>=Pkg: numpy 2.5.2 - noarch
++#>=Flv: py314_ft_1
++#>=Bvr: 1
++#>=Tim: 1788129265
++#>=Req: python
++#>=Req: python_abi <CONDA> 3.14.*\20*_cp314t
++#>=Pkg: numpy 2.5.2 - noarch
++#>=Flv: py314_gil_1
++#>=Bvr: 1
++#>=Tim: 1788129265
++#>=Req: python
++#>=Req: python_abi <CONDA> 3.14.*\20*_cp314
++repo main 0 testtags <inline>
++#>=Pkg: python_abi 3.14 - noarch
++#>=Flv: 0_cp314
++#>=Bvr: 0
++#>=Pkg: python_abi 3.14 - noarch
++#>=Flv: 0_cp314t
++#>=Bvr: 0
++system unset conda system
++
++job install name numpy
++result transaction,problems <inline>
++#>install numpy-2.5.2-py314_gil_1.noarch@conda-forge
++#>install python-3.14.7-h0_106_cp314.noarch@conda-forge
++#>install python_abi-3.14-8_cp314.noarch@conda-forge
